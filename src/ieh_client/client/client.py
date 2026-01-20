@@ -64,10 +64,24 @@ class _APIClient:
                 url, json=payload, headers=self.headers, timeout=self.timeout, verify=False
             )
             response.raise_for_status()
-        except requests.exceptions.Timeout:
-            raise TimeoutError(f"Request to {url} timed out after {self.timeout}s")
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 422:
+                detail = e.response.json().get("detail", [])
+                if isinstance(detail, list):
+                    # Format: "Field 'yearly_energy_kwh' in body: Input should be a valid number"
+                    error_messages = [
+                        f"Field '{' -> '.join(map(str, err['loc']))}': {err['msg']} (Received: {err.get('input')})"
+                        for err in detail
+                    ]
+                    error_str = "; ".join(error_messages)
+                    raise ValueError(f"Validation Failed: {error_str}")
+                else:
+                    raise ValueError(f"API Error: {detail}")
+            
+            raise ConnectionError(f"Request failed with status {e.response.status_code}: {e.response.text}")
+        
         except requests.exceptions.RequestException as e:
-            raise ConnectionError(f"Request to {url} failed: {e}")
+            raise ConnectionError(f"Network/Transport error: {e}")
 
         return response.json()
 
@@ -140,8 +154,8 @@ class ProfileAPIClient(_APIClient):
                 The index represents time steps according to the chosen resolution.
         """
         payload = {
-            "start": start.isoformat(),
-            "end": end.isoformat(),
+            "start": start.strftime("%Y-%m-%d %H:%M:%S"),
+            "end": end.strftime("%Y-%m-%d %H:%M:%S"),
             "resolution_minutes": int(resolution.total_seconds() // 60),
             "building_usage": building_usage,
             "yearly_energy_kwh": yearly_energy_kwh,
@@ -217,13 +231,15 @@ class ProfileAPIClient(_APIClient):
         else:
             power_nom_kw = (power_nom_kw, power_nom_kw)
         payload = {
-            "start": start.isoformat(),
-            "end": end.isoformat(),
+            "start": start.strftime("%Y-%m-%d %H:%M:%S"),
+            "end": end.strftime("%Y-%m-%d %H:%M:%S"),
             "resolution_minutes": int(resolution.total_seconds() // 60),
-            "coordinates": coordinates,
+            "latitude": coordinates[0],
+            "longitude":coordinates[1],
             "power_range_lower": power_nom_kw[0],
             "power_range_upper": power_nom_kw[1],
-            "charging_technology": charging_technology
+            "charging_technology": charging_technology,
+            "ignore_map":False
         }
         data = self._post("/generate-charging-profile", payload)
         return pd.DataFrame(data)
