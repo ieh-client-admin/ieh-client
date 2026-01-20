@@ -23,7 +23,7 @@ def main() -> None:
         start=datetime(2025, 1, 1),
         end=datetime(2025, 1, 31),
         resolution=timedelta(hours=1),
-        building_usage=["household", "business"],
+        building_usage=["household"],
         yearly_energy_kwh=12000.0,
         working_days=["monday", "tuesday", "wednesday", "thursday", "friday"],
     )
