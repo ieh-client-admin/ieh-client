@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta
-from typing import Literal, Iterable
+from typing import Literal
+from collections.abc import Iterable, Sized
 from beartype import beartype
 
 from dotenv import load_dotenv
@@ -77,9 +78,9 @@ class _APIClient:
                     raise ValueError(f"Validation Failed: {error_str}")
                 else:
                     raise ValueError(f"API Error: {detail}")
-            
+
             raise ConnectionError(f"Request failed with status {e.response.status_code}: {e.response.text}")
-        
+
         except requests.exceptions.RequestException as e:
             raise ConnectionError(f"Network/Transport error: {e}")
 
@@ -121,20 +122,24 @@ class ProfileAPIClient(_APIClient):
                 Defaults to 1 hour.
 
             building_usage (str | Iterable[str], optional):
-                Usage type of the building.
-                Supported values are:
+                Usage type of the building(s). Supported values are:
 
                 - ``"household"``
                 - ``"agriculture"``
                 - ``"business"``
                 - ``"industrial"``
 
-                May be provided as a single value or as an iterable of values.
+                May be provided either as a single value or as an iterable of values.
+                If provided as an iterable, ``yearly_energy_kwh`` must also be an
+                iterable of the same length.
                 Defaults to ``"household"``.
 
             yearly_energy_kwh (float | Iterable[float], optional):
-                Annual energy demand of the building in kilowatt-hours.
-                May be provided as a single value or as an iterable of values.
+                Annual energy demand of the building(s) in kilowatt-hours.
+
+                May be provided either as a single float or as an iterable of floats.
+                If provided as an iterable, ``building_usage`` must also be an
+                iterable of the same length.
                 Defaults to ``1000``.
 
             working_days (Iterable[int | str] | None, optional):
@@ -153,6 +158,7 @@ class ProfileAPIClient(_APIClient):
                 A DataFrame containing the generated building load profile.
                 The index represents time steps according to the chosen resolution.
         """
+        _validate_building_profile_input(building_usage=building_usage, yearly_energy_kwh=yearly_energy_kwh)
         payload = {
             "start": start.strftime("%Y-%m-%d %H:%M:%S"),
             "end": end.strftime("%Y-%m-%d %H:%M:%S"),
@@ -235,13 +241,101 @@ class ProfileAPIClient(_APIClient):
             "end": end.strftime("%Y-%m-%d %H:%M:%S"),
             "resolution_minutes": int(resolution.total_seconds() // 60),
             "latitude": coordinates[0],
-            "longitude":coordinates[1],
+            "longitude": coordinates[1],
             "power_range_lower": power_nom_kw[0],
             "power_range_upper": power_nom_kw[1],
             "charging_technology": charging_technology,
-            "ignore_map":False
+            "ignore_map": False
         }
         data = self._post("/generate-charging-profile", payload)
         return pd.DataFrame(data)
 
     generate_cplpg_profile = generate_charging_point_profile
+
+    @beartype
+    def generate_truck_profile(
+            self,
+            start: datetime,
+            end: datetime,
+            resolution: timedelta = timedelta(hours=1),
+            n_bet: int = 1,
+            site_type: Literal[
+                "distribution_center", "industrial_logistics_hub", "general_cargo_hub",
+                "freight_logistics_center", "transport_and_warehousing", "infrastructure_logistics_hub"
+            ] = "distribution_center",
+    ) -> pd.DataFrame:
+        """
+    Generate a load profile for a truck logistic center using the IEH TLPG
+    (Truck Load Profile Generator) service.
+
+    The method sends the specified parameters to the backend service and
+    returns the resulting load profile as a pandas DataFrame.
+
+    Args:
+        start (datetime):
+            Start timestamp of the charging point profile (inclusive).
+
+        end (datetime):
+            End timestamp of the charging point profile (exclusive).
+
+        resolution (timedelta, optional):
+            Temporal resolution of the generated profile.
+            Defaults to 1 hour.
+
+        n_bet (int, optional):
+            Number of bet (battery electric trucks) to generate.
+            Defaults to 1.
+
+        site_type (str | None, optional):
+            Type of the site being generated.
+            Supported values are:
+            - ``"distribution_center"``
+            - ``"industrial_logistics_hub"``
+            - ``"general_cargo_hub"``
+            - ``"freight_logistics_center"``
+            - ``"transport_and_warehousing"``
+            - ``"infrastructure_logistics_hub"``
+
+    Returns:
+        pandas.DataFrame:
+            A DataFrame containing the generated truck logistic center load profile.
+            The index represents time steps according to the chosen resolution.
+    """
+        payload = {
+            "start": start.strftime("%Y-%m-%d %H:%M:%S"),
+            "end": end.strftime("%Y-%m-%d %H:%M:%S"),
+            "resolution_minutes": int(resolution.total_seconds() // 60),
+            "n_bet": n_bet,
+            "site_type": site_type,
+        }
+        data = self._post("/generate-truck-profile", payload)
+        return pd.DataFrame(data)
+
+    generate_tlpg_profile = generate_truck_profile
+
+
+def _validate_building_profile_input(
+    building_usage: str | Iterable[str],
+    yearly_energy_kwh: float | Iterable[float],
+) -> None:
+    usage_is_seq = not isinstance(building_usage, (str, bytes)) and isinstance(building_usage, Iterable)
+    energy_is_seq = not isinstance(yearly_energy_kwh, (str, bytes)) and isinstance(yearly_energy_kwh, Iterable)
+
+    if usage_is_seq != energy_is_seq:
+        raise TypeError(
+            "building_usage and yearly_energy_kwh must either BOTH be scalars "
+            "(str, float) or BOTH be sequences of equal length."
+        )
+
+    if usage_is_seq:
+        if not isinstance(building_usage, Sized) or not isinstance(yearly_energy_kwh, Sized):
+            raise TypeError(
+                "When providing sequences, building_usage and yearly_energy_kwh must be sized "
+                "(e.g. list/tuple) so their lengths can be compared."
+            )
+
+        if len(building_usage) != len(yearly_energy_kwh):  # type: ignore[arg-type]
+            raise ValueError(
+                "building_usage and yearly_energy_kwh must have the same length when provided as sequences. "
+                f"Got len(building_usage)={len(building_usage)} and len(yearly_energy_kwh)={len(yearly_energy_kwh)}."
+            )
