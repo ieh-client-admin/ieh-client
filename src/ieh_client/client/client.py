@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
 from typing import Literal
-from collections.abc import Iterable, Sized
+from collections.abc import Iterable
 from beartype import beartype
 
 from dotenv import load_dotenv
@@ -11,7 +11,15 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import urllib3
 
+from ieh_client.validation.validation import validate_building_profile_input, validate_country_holidays, \
+    validate_subdivision_holidays
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+try:
+    import holidays
+except ModuleNotFoundError:  # Optional dependency in minimal environments.
+    holidays = None
 
 
 class _APIClient:
@@ -69,7 +77,6 @@ class _APIClient:
             if e.response.status_code == 422:
                 detail = e.response.json().get("detail", [])
                 if isinstance(detail, list):
-                    # Format: "Field 'yearly_energy_kwh' in body: Input should be a valid number"
                     error_messages = [
                         f"Field '{' -> '.join(map(str, err['loc']))}': {err['msg']} (Received: {err.get('input')})"
                         for err in detail
@@ -85,6 +92,13 @@ class _APIClient:
             raise ConnectionError(f"Network/Transport error: {e}")
 
         return response.json()
+
+    @staticmethod
+    def _process_response(data: dict) -> pd.DataFrame:
+        df = pd.DataFrame(data)
+        if "timestamp" in df.keys():
+            df.set_index("timestamp", inplace=True)
+        return df
 
 
 class ProfileAPIClient(_APIClient):
@@ -103,62 +117,48 @@ class ProfileAPIClient(_APIClient):
                 "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "public_holiday"
             ]] | None = None
     ) -> pd.DataFrame:
-        """
-        Generate a building load profile using the IEH BLPG
-        (Building Load Profile Generator) service.
-
-        The method sends the specified parameters to the backend service and
-        returns the resulting building load profile as a pandas DataFrame.
+        """Generate a building load profile via the BLPG endpoint.
 
         Args:
-            start (datetime):
-                Start timestamp of the building profile (inclusive).
-
-            end (datetime):
-                End timestamp of the building profile (exclusive).
-
-            resolution (timedelta, optional):
-                Temporal resolution of the generated profile.
-                Defaults to 1 hour.
-
-            building_usage (str | Iterable[str], optional):
-                Usage type of the building(s). Supported values are:
-
-                - ``"household"``
-                - ``"agriculture"``
-                - ``"business"``
-                - ``"industrial"``
-
-                May be provided either as a single value or as an iterable of values.
-                If provided as an iterable, ``yearly_energy_kwh`` must also be an
-                iterable of the same length.
-                Defaults to ``"household"``.
-
+            start (datetime): Start timestamp (inclusive).
+            end (datetime): End timestamp (exclusive).
+            resolution (timedelta, optional): Time resolution of the output profile.
+                Defaults to ``timedelta(hours=1)``.
+            building_usage (Literal[...] | Iterable[Literal[...]], optional):
+                Building usage class or multiple classes. Allowed values are
+                ``"agriculture"``, ``"household"``, ``"business"``, and
+                ``"industrial"``.
             yearly_energy_kwh (float | Iterable[float], optional):
-                Annual energy demand of the building(s) in kilowatt-hours.
-
-                May be provided either as a single float or as an iterable of floats.
-                If provided as an iterable, ``building_usage`` must also be an
-                iterable of the same length.
-                Defaults to ``1000``.
-
-            working_days (Iterable[int | str] | None, optional):
-                Days of the week on which the building is considered occupied or active.
-                Days may be specified either as integers (``0`` = Monday, ``6`` = Sunday)
-                or as strings:
-
-                - ``"monday"`` … ``"sunday"``
-                - ``"public_holiday"``
-
-                If ``None``, a default working-day configuration
-                (typically Monday–Friday) is used by the service.
+                Annual energy demand in kWh. If an iterable is provided,
+                ``building_usage`` must also be an iterable of identical length.
+            working_days (Iterable[int | Literal[...]] | None, optional):
+                Active weekdays as integers (``0`` = Monday, ..., ``6`` = Sunday)
+                or names (``"monday"`` ... ``"sunday"``, ``"public_holiday"``).
 
         Returns:
-            pandas.DataFrame:
-                A DataFrame containing the generated building load profile.
-                The index represents time steps according to the chosen resolution.
+            pd.DataFrame: Generated load profile time series.
+
+        Raises:
+            ValueError: If input validation fails or the API rejects the payload.
+            ConnectionError: If the request fails due to HTTP or transport issues.
+
+        Examples:
+            ```python
+            from datetime import datetime, timedelta
+            from ieh_client import ProfileAPIClient
+
+            client = ProfileAPIClient(api_key="your-key")
+            df = client.generate_building_profile(
+                start=datetime(2026, 1, 1),
+                end=datetime(2026, 1, 2),
+                resolution=timedelta(minutes=15),
+                building_usage="household",
+                yearly_energy_kwh=3500.0,
+                working_days=["monday", "tuesday", "wednesday", "thursday", "friday"],
+            )
+            ```
         """
-        _validate_building_profile_input(building_usage=building_usage, yearly_energy_kwh=yearly_energy_kwh)
+        validate_building_profile_input(building_usage=building_usage, yearly_energy_kwh=yearly_energy_kwh)
         payload = {
             "start": start.strftime("%Y-%m-%d %H:%M:%S"),
             "end": end.strftime("%Y-%m-%d %H:%M:%S"),
@@ -169,7 +169,7 @@ class ProfileAPIClient(_APIClient):
             "working_days": working_days
         }
         data = self._post("/generate-building-profile", payload)
-        return pd.DataFrame(data)
+        return self._process_response(data)
 
     generate_blpg_profile = generate_building_profile
 
@@ -183,52 +183,46 @@ class ProfileAPIClient(_APIClient):
             power_nom_kw: None | float | tuple[float, float] = None,
             charging_technology: None | str = None,
     ) -> pd.DataFrame:
+        """Generate a charging-point load profile via the CPLPG endpoint.
+
+        Args:
+            start (datetime): Start timestamp (inclusive).
+            end (datetime): End timestamp (exclusive).
+            resolution (timedelta, optional): Time resolution of the output profile.
+                Defaults to ``timedelta(hours=1)``.
+            coordinates (tuple[float, float] | None, optional):
+                Charging-point coordinates as ``(latitude, longitude)``.
+            power_nom_kw (float | tuple[float, float] | None, optional):
+                Nominal power in kW. A tuple is interpreted as
+                ``(min_kw, max_kw)``.
+            charging_technology (str | None, optional):
+                Charging technology (typically ``"AC"`` or ``"DC"``).
+
+        Returns:
+            pd.DataFrame: Generated charging-point load profile.
+
+        Raises:
+            ValueError: If ``power_nom_kw`` tuple bounds are invalid.
+            TypeError: If ``coordinates`` is ``None`` (current implementation
+                expects indexable coordinates).
+            ConnectionError: If the request fails due to HTTP or transport issues.
+
+        Examples:
+            ```python
+            from datetime import datetime, timedelta
+            from ieh_client import ProfileAPIClient
+
+            client = ProfileAPIClient(api_key="your-key")
+            df = client.generate_charging_point_profile(
+                start=datetime(2026, 1, 1),
+                end=datetime(2026, 1, 2),
+                resolution=timedelta(minutes=30),
+                coordinates=(48.7784, 9.1800),
+                power_nom_kw=(11.0, 22.0),
+                charging_technology="AC",
+            )
+            ```
         """
-    Generate a charging point load profile using the IEH CPLPG
-    (Charging Point Load Profile Generator) service.
-
-    The method sends the specified parameters to the backend service and
-    returns the resulting load profile as a pandas DataFrame.
-
-    Args:
-        start (datetime):
-            Start timestamp of the charging point profile (inclusive).
-
-        end (datetime):
-            End timestamp of the charging point profile (exclusive).
-
-        resolution (timedelta, optional):
-            Temporal resolution of the generated profile.
-            Defaults to 1 hour.
-
-        coordinates (tuple[float, float] | None, optional):
-            Geographic coordinates of the charging point given as
-            ``(latitude, longitude)`` in EPSG:4326 (WGS84).
-            If ``None``, a default or aggregated location is used by the service.
-            Note that only coordinates in Baden-Wuerttemberg are supported.
-
-        power_nom_kw (float | tuple[float, float] | None, optional):
-            Nominal power of the charging point in kilowatts.
-
-            - If a single float is provided, this value is used directly.
-            - If a tuple ``(min_kw, max_kw)`` is provided, the value is interpreted
-              as a continuous range between the two bounds (inclusive).
-            - If ``None``, the service default configuration is used.
-
-        charging_technology (str | None, optional):
-            Charging technology of the charging point.
-            Supported values are:
-
-            - ``"AC"``: AC charging points (Type 2 or Schuko connector)
-            - ``"DC"``: DC charging points (CCS or CHAdeMO connector)
-
-            If ``None``, the charging technology is inferred or defaults are used.
-
-    Returns:
-        pandas.DataFrame:
-            A DataFrame containing the generated charging point load profile.
-            The index represents time steps according to the chosen resolution.
-    """
         if power_nom_kw is not None and isinstance(power_nom_kw, tuple):
             if len(power_nom_kw) != 2 or power_nom_kw[0] > power_nom_kw[1]:
                 raise ValueError(
@@ -248,7 +242,7 @@ class ProfileAPIClient(_APIClient):
             "ignore_map": False
         }
         data = self._post("/generate-charging-profile", payload)
-        return pd.DataFrame(data)
+        return self._process_response(data)
 
     generate_cplpg_profile = generate_charging_point_profile
 
@@ -258,84 +252,97 @@ class ProfileAPIClient(_APIClient):
             start: datetime,
             end: datetime,
             resolution: timedelta = timedelta(hours=1),
-            n_bet: int = 1,
-            site_type: Literal[
-                "distribution_center", "industrial_logistics_hub", "general_cargo_hub",
-                "freight_logistics_center", "transport_and_warehousing", "infrastructure_logistics_hub"
+            n_trucks: int = 1,
+            location_type: Literal[
+                "distribution_center",
+                "general_cargo_depot",
+                "cep_depot",
+                "shipping_center",
+                "warehouse",
+                "rest_stop",
             ] = "distribution_center",
+            power_nom_charging_point_kw: float = 150,
+            charging_mode: Literal["AC", "DC"] | None = None,
+            charging_efficiency: float = 0.95,
+            soc_cc_to_cv: float = 0.8,
+            switch_off_power_kw: float = 1.0,
+            min_charging_duration_minutes: int = 5,
+            country: str = "DE",
+            subdiv: str = "BW",
     ) -> pd.DataFrame:
+        """Generate a truck charging profile via the TLPG endpoint.
+
+        Args:
+            start (datetime): Start timestamp (inclusive).
+            end (datetime): End timestamp (exclusive).
+            resolution (timedelta, optional): Time resolution of the output profile.
+                Defaults to ``timedelta(hours=1)``.
+            n_trucks (int, optional): Number of trucks in the simulation.
+                Defaults to ``1``.
+            location_type (Literal[...], optional): Logistics site type. Defaults
+                to ``"distribution_center"``.
+            power_nom_charging_point_kw (float, optional): Nominal charging power
+                in kW. Defaults to ``150``.
+            charging_mode (Literal["AC", "DC"] | None, optional): Charging mode
+                selector. Defaults to ``None``.
+            charging_efficiency (float, optional): Charging efficiency factor.
+                Defaults to ``0.95``.
+            soc_cc_to_cv (float, optional): SOC threshold for CC-to-CV transition.
+                Defaults to ``0.8``.
+            switch_off_power_kw (float, optional): Charging stop threshold in kW.
+                Defaults to ``1.0``.
+            min_charging_duration_minutes (int, optional): Minimum charging event
+                duration in minutes. Defaults to ``5``.
+            country (str, optional): Country code for holiday handling.
+                Defaults to ``"DE"``.
+            subdiv (str, optional): Subdivision code for holiday handling.
+                Defaults to ``"BW"``.
+
+        Returns:
+            pd.DataFrame: Generated truck charging load profile.
+
+        Raises:
+            ValueError: If country/subdivision holiday inputs are invalid or the
+                API rejects the payload.
+            ConnectionError: If the request fails due to HTTP or transport issues.
+
+        Examples:
+            ```python
+            from datetime import datetime, timedelta
+            from ieh_client import ProfileAPIClient
+
+            client = ProfileAPIClient(api_key="your-key")
+            df = client.generate_truck_profile(
+                start=datetime(2026, 1, 1),
+                end=datetime(2026, 1, 2),
+                resolution=timedelta(minutes=15),
+                n_trucks=25,
+                location_type="warehouse",
+                power_nom_charging_point_kw=300.0,
+                charging_mode="DC",
+            )
+            ```
         """
-    Generate a load profile for a truck logistic center using the IEH TLPG
-    (Truck Load Profile Generator) service.
-
-    The method sends the specified parameters to the backend service and
-    returns the resulting load profile as a pandas DataFrame.
-
-    Args:
-        start (datetime):
-            Start timestamp of the charging point profile (inclusive).
-
-        end (datetime):
-            End timestamp of the charging point profile (exclusive).
-
-        resolution (timedelta, optional):
-            Temporal resolution of the generated profile.
-            Defaults to 1 hour.
-
-        n_bet (int, optional):
-            Number of bet (battery electric trucks) to generate.
-            Defaults to 1.
-
-        site_type (str | None, optional):
-            Type of the site being generated.
-            Supported values are:
-            - ``"distribution_center"``
-            - ``"industrial_logistics_hub"``
-            - ``"general_cargo_hub"``
-            - ``"freight_logistics_center"``
-            - ``"transport_and_warehousing"``
-            - ``"infrastructure_logistics_hub"``
-
-    Returns:
-        pandas.DataFrame:
-            A DataFrame containing the generated truck logistic center load profile.
-            The index represents time steps according to the chosen resolution.
-    """
+        if country != "DE":
+            validate_country_holidays(country)
+        if subdiv != "BW":
+            validate_subdivision_holidays(country, subdiv)
         payload = {
             "start": start.strftime("%Y-%m-%d %H:%M:%S"),
             "end": end.strftime("%Y-%m-%d %H:%M:%S"),
             "resolution_minutes": int(resolution.total_seconds() // 60),
-            "n_bet": n_bet,
-            "site_type": site_type,
+            "n_trucks": n_trucks,
+            "location_type": location_type,
+            "power_nom_charging_point_kw": power_nom_charging_point_kw,
+            "charging_mode": charging_mode,
+            "charging_efficiency": charging_efficiency,
+            "soc_cc_to_cv": soc_cc_to_cv,
+            "switch_off_power_kw": switch_off_power_kw,
+            "min_charging_duration_minutes": min_charging_duration_minutes,
+            "country": country,
+            "subdiv": subdiv
         }
         data = self._post("/generate-truck-profile", payload)
-        return pd.DataFrame(data)
+        return self._process_response(data)
 
     generate_tlpg_profile = generate_truck_profile
-
-
-def _validate_building_profile_input(
-    building_usage: str | Iterable[str],
-    yearly_energy_kwh: float | Iterable[float],
-) -> None:
-    usage_is_seq = not isinstance(building_usage, (str, bytes)) and isinstance(building_usage, Iterable)
-    energy_is_seq = not isinstance(yearly_energy_kwh, (str, bytes)) and isinstance(yearly_energy_kwh, Iterable)
-
-    if usage_is_seq != energy_is_seq:
-        raise TypeError(
-            "building_usage and yearly_energy_kwh must either BOTH be scalars "
-            "(str, float) or BOTH be sequences of equal length."
-        )
-
-    if usage_is_seq:
-        if not isinstance(building_usage, Sized) or not isinstance(yearly_energy_kwh, Sized):
-            raise TypeError(
-                "When providing sequences, building_usage and yearly_energy_kwh must be sized "
-                "(e.g. list/tuple) so their lengths can be compared."
-            )
-
-        if len(building_usage) != len(yearly_energy_kwh):  # type: ignore[arg-type]
-            raise ValueError(
-                "building_usage and yearly_energy_kwh must have the same length when provided as sequences. "
-                f"Got len(building_usage)={len(building_usage)} and len(yearly_energy_kwh)={len(yearly_energy_kwh)}."
-            )
