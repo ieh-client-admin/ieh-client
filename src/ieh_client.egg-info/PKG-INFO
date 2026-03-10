@@ -1,0 +1,55 @@
+Metadata-Version: 2.4
+Name: ieh-client
+Version: 1.0.1
+Summary: API client for the remote simulation of prosumer profiles using the ieh prosumer profile generators on a simulation server
+Author-email: Johannes Beck <johannes.beck@ieh.uni-stuttgart.de>
+License-Expression: MIT
+Project-URL: Repository, https://github.com/ieh-client-admin/ieh-client
+Keywords: python,timeseries,simulation,profile,prosumer,power,energy,markov,monte-carlo
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: beartype>=0.19
+Requires-Dist: pandas<3,>=2.2
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: requests>=2.32
+Requires-Dist: urllib3>=2.2
+Provides-Extra: holidays
+Requires-Dist: holidays>=0.56; extra == "holidays"
+Provides-Extra: plot
+Requires-Dist: matplotlib>=3.8; extra == "plot"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3; extra == "dev"
+Requires-Dist: ruff>=0.6; extra == "dev"
+Dynamic: license-file
+
+# ieh-client
+
+Python client for running IEH profile generators on the remote IEH simulation server.
+
+## Overview
+
+`ieh-client` connects your local Python application to the IEH API and returns generated time-series data as `pandas.DataFrame` objects.
+
+Supported generators:
+
+- Truck charging profile (`generate_truck_profile`)
+- Building load profile (`generate_building_profile`)
+- Charging point profile (`generate_charging_point_profile`)
+
+## Architecture
+
+```text
++--------------------+      HTTPS API      +---------------------+      Internal compute      +--------------------------+
+| Local PC           | <-----------------> | ieh-client (Python) | <------------------------> | IEH simulation server    |
+| your script/notebook|                    | request + validation |                           | profile generators (API) |
++--------------------+                     +---------------------+                            +--------------------------+
+```
+
+## Documentation
+
+- [Client Usage](docs/client_usage.md)
+- [Installation](docs/installation.md)
+- [Truck Profile Generator (`generate_truck_profile`)](docs/generate_truck_profile.md)
+- [Building Profile Generator (`generate_building_profile`)](docs/generate_building_profile.md)
+- [Charging Point Profile Generator (`generate_charging_point_profile`)](docs/generate_charging_point_profile.md)

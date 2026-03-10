@@ -1,0 +1,15 @@
+beartype>=0.19
+pandas<3,>=2.2
+python-dotenv>=1.0
+requests>=2.32
+urllib3>=2.2
+
+[dev]
+pytest>=8.3
+ruff>=0.6
+
+[holidays]
+holidays>=0.56
+
+[plot]
+matplotlib>=3.8

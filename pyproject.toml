@@ -7,7 +7,7 @@ name = "ieh-client"
 authors = [
     { name = "Johannes Beck", email = "johannes.beck@ieh.uni-stuttgart.de" },
 ]
-version = "1.0.0"
+version = "1.0.1"
 description = "API client for the remote simulation of prosumer profiles using the ieh prosumer profile generators on a simulation server"
 readme = "README.md"
 requires-python = ">=3.11"
