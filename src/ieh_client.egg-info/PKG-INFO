@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: ieh-client
-Version: 1.0.1
+Version: 1.0.2
 Summary: API client for the remote simulation of prosumer profiles using the ieh prosumer profile generators on a simulation server
 Author-email: Johannes Beck <johannes.beck@ieh.uni-stuttgart.de>
 License-Expression: MIT

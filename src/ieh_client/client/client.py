@@ -165,7 +165,6 @@ class ProfileAPIClient(_APIClient):
             "resolution_minutes": int(resolution.total_seconds() // 60),
             "building_usage": building_usage,
             "yearly_energy_kwh": yearly_energy_kwh,
-            "generation_method": "semi_markov",
             "working_days": working_days
         }
         data = self._post("/generate-building-profile", payload)
