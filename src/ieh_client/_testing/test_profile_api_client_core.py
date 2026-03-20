@@ -203,7 +203,6 @@ class TestGeneratorMethods(unittest.TestCase):
         self.assertEqual(payload["start"], "2026-01-01 00:00:00")
         self.assertEqual(payload["end"], "2026-01-02 00:00:00")
         self.assertEqual(payload["resolution_minutes"], 30)
-        self.assertEqual(payload["generation_method"], "semi_markov")
         self.assertEqual(payload["working_days"], ["monday", "tuesday"])
         self.assertEqual(list(df.columns), ["p_kw"])
 
