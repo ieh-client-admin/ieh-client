@@ -15,7 +15,7 @@ df = client.generate_charging_point_profile(
     resolution=timedelta(minutes=30),
     coordinates=(48.7784, 9.1800),
     power_nom_kw=(11.0, 22.0),
-    charging_technology="AC",
+    charging_mode="AC",
 )
 ```
 
@@ -28,7 +28,7 @@ df = client.generate_charging_point_profile(
 | `resolution` | `timedelta` | Any positive duration (internally converted to minutes) | Output time resolution. Default: `timedelta(hours=1)`. |
 | `coordinates` | `tuple[float, float] \| None` | Tuple `(latitude, longitude)` | Geographic location of the charging point. |
 | `power_nom_kw` | `float \| tuple[float, float] \| None` | Single value or `(min_kw, max_kw)` with `min_kw <= max_kw` | Nominal charging power range in kW. |
-| `charging_technology` | `str \| None` | Typical values: `"AC"`, `"DC"` | Charging technology label passed to API. |
+| `charging_mode` | `str \| None` | Typical values: `"AC"`, `"DC"` | Charging technology label passed to API. |
 
 ## Notes
 

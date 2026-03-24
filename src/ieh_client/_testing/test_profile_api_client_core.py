@@ -217,7 +217,7 @@ class TestGeneratorMethods(unittest.TestCase):
                 resolution=timedelta(hours=1),
                 coordinates=(48.7784, 9.18),
                 power_nom_kw=22.0,
-                charging_technology="AC",
+                charging_mode="AC",
             )
 
         endpoint, payload = post_mock.call_args.args
@@ -227,7 +227,7 @@ class TestGeneratorMethods(unittest.TestCase):
         self.assertEqual(payload["power_range_lower"], 22.0)
         self.assertEqual(payload["power_range_upper"], 22.0)
         self.assertEqual(payload["resolution_minutes"], 60)
-        self.assertEqual(payload["charging_technology"], "AC")
+        self.assertEqual(payload["charging_mode"], "AC")
 
     def test_generate_charging_point_profile_invalid_power_tuple(self):
         with self.assertRaises(ValueError):

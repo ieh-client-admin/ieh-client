@@ -158,6 +158,10 @@ class ProfileAPIClient(_APIClient):
             )
             ```
         """
+        if isinstance(building_usage, str):
+            building_usage = [building_usage]
+        if isinstance(yearly_energy_kwh, (int, float)):
+            yearly_energy_kwh = [yearly_energy_kwh]
         validate_building_profile_input(building_usage=building_usage, yearly_energy_kwh=yearly_energy_kwh)
         payload = {
             "start": start.strftime("%Y-%m-%d %H:%M:%S"),
@@ -180,7 +184,7 @@ class ProfileAPIClient(_APIClient):
             resolution: timedelta = timedelta(hours=1),
             coordinates: None | tuple[float, float] = None,
             power_nom_kw: None | float | tuple[float, float] = None,
-            charging_technology: None | str = None,
+            charging_mode: None | str = None,
     ) -> pd.DataFrame:
         """Generate a charging-point load profile via the CPLPG endpoint.
 
@@ -194,8 +198,8 @@ class ProfileAPIClient(_APIClient):
             power_nom_kw (float | tuple[float, float] | None, optional):
                 Nominal power in kW. A tuple is interpreted as
                 ``(min_kw, max_kw)``.
-            charging_technology (str | None, optional):
-                Charging technology (typically ``"AC"`` or ``"DC"``).
+            charging_mode (str | None, optional):
+                Charging mode (typically ``"AC"`` or ``"DC"``).
 
         Returns:
             pd.DataFrame: Generated charging-point load profile.
@@ -218,7 +222,7 @@ class ProfileAPIClient(_APIClient):
                 resolution=timedelta(minutes=30),
                 coordinates=(48.7784, 9.1800),
                 power_nom_kw=(11.0, 22.0),
-                charging_technology="AC",
+                charging_mode="AC",
             )
             ```
         """
@@ -237,8 +241,7 @@ class ProfileAPIClient(_APIClient):
             "longitude": coordinates[1],
             "power_range_lower": power_nom_kw[0],
             "power_range_upper": power_nom_kw[1],
-            "charging_technology": charging_technology,
-            "ignore_map": False
+            "charging_mode": charging_mode
         }
         data = self._post("/generate-charging-profile", payload)
         return self._process_response(data)
@@ -276,7 +279,7 @@ class ProfileAPIClient(_APIClient):
             end (datetime): End timestamp (exclusive).
             resolution (timedelta, optional): Time resolution of the output profile.
                 Defaults to ``timedelta(hours=1)``.
-            n_trucks (int, optional): Number of trucks in the simulation.
+            n_trucks (int, optional): Number of trucks in the simulation (1 to 500).
                 Defaults to ``1``.
             location_type (Literal[...], optional): Logistics site type. Defaults
                 to ``"distribution_center"``.
@@ -326,6 +329,8 @@ class ProfileAPIClient(_APIClient):
             validate_country_holidays(country)
         if subdiv != "BW":
             validate_subdivision_holidays(country, subdiv)
+        if not 1 <= n_trucks <= 500:
+            raise ValueError("n_trucks must be 1 or 500")
         payload = {
             "start": start.strftime("%Y-%m-%d %H:%M:%S"),
             "end": end.strftime("%Y-%m-%d %H:%M:%S"),

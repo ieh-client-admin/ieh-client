@@ -11,7 +11,7 @@ def main() -> None:
         resolution=timedelta(minutes=30),
         coordinates=(48.7784, 9.1800),
         power_nom_kw=(11.0, 22.0),
-        charging_technology="AC",
+        charging_mode="AC",
     )
     print(df.head())
 
