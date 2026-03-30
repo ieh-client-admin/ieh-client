@@ -15,7 +15,7 @@ def main() -> None:
         power_nom_charging_point_kw=300.0,
         charging_mode="DC",
     )
-    df.plot()
+    df.plot(ylabel="Power / kW", legend=False)
     plt.show()
 
 
