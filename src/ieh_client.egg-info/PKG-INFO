@@ -1,12 +1,12 @@
 Metadata-Version: 2.4
 Name: ieh-client
-Version: 1.0.3
+Version: 1.0.4
 Summary: API client for the remote simulation of prosumer profiles using the ieh prosumer profile generators on a simulation server
 Author-email: Johannes Beck <johannes.beck@ieh.uni-stuttgart.de>
 License-Expression: MIT
 Project-URL: Repository, https://github.com/ieh-client-admin/ieh-client
 Keywords: python,timeseries,simulation,profile,prosumer,power,energy,markov,monte-carlo
-Requires-Python: >=3.11
+Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: beartype>=0.19
