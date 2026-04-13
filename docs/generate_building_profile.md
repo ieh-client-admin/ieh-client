@@ -16,19 +16,21 @@ df = client.generate_building_profile(
     building_usage="household",
     yearly_energy_kwh=3500.0,
     working_days=["monday", "tuesday", "wednesday", "thursday", "friday"],
+    random_seed=42,
 )
 ```
 
 ## Parameters
 
-| Name | Type | Allowed values | Description |
-|---|---|---|---|
-| `start` | `datetime` | Any valid datetime | Inclusive start timestamp. |
-| `end` | `datetime` | Any valid datetime | Exclusive end timestamp. |
-| `resolution` | `timedelta` | Any positive duration (internally converted to minutes) | Output time resolution. Default: `timedelta(hours=1)`. |
-| `building_usage` | `Literal[...] \| Iterable[Literal[...]]` | Scalar or sequence of: `"agriculture"`, `"household"`, `"business"`, `"industrial"` | Building usage class(es). |
-| `yearly_energy_kwh` | `float \| Iterable[float]` | Scalar float or sequence of floats | Annual energy demand in kWh. |
-| `working_days` | `Iterable[int \| Literal[...]] \| None` | `0..6` (`0 = monday`) and/or names `"monday"` ... `"sunday"`, `"public_holiday"`, or `None` | Active days for load generation. |
+| Name                | Type                                     | Allowed values                                                                              | Description                                                 |
+|---------------------|------------------------------------------|---------------------------------------------------------------------------------------------|-------------------------------------------------------------|
+| `start`             | `datetime`                               | Any valid datetime                                                                          | Inclusive start timestamp.                                  |
+| `end`               | `datetime`                               | Any valid datetime                                                                          | Exclusive end timestamp.                                    |
+| `resolution`        | `timedelta`                              | Any positive duration (internally converted to minutes)                                     | Output time resolution. Default: `timedelta(hours=1)`.      |
+| `building_usage`    | `Literal[...] \| Iterable[Literal[...]]` | Scalar or sequence of: `"agriculture"`, `"household"`, `"business"`, `"industrial"`         | Building usage class(es).                                   |
+| `yearly_energy_kwh` | `float \| Iterable[float]`               | Scalar float or sequence of floats                                                          | Annual energy demand in kWh.                                |
+| `working_days`      | `Iterable[int \| Literal[...]] \| None`  | `0..6` (`0 = monday`) and/or names `"monday"` ... `"sunday"`, `"public_holiday"`, or `None` | Active days for load generation.                            |
+| `random_seed`       | `int \| None`                            | Any integer or `None` (default: `None`)                                                     | Seed passed to numpy.random.default_rng for reproducibility |
 
 ## Notes
 

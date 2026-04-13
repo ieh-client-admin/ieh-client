@@ -17,26 +17,28 @@ df = client.generate_truck_profile(
     location_type="warehouse",
     power_nom_charging_point_kw=300.0,
     charging_mode="DC",
+    random_seed=42,
 )
 ```
 
 ## Parameters
 
-| Name | Type | Allowed values | Description |
-|---|---|---|---|
-| `start` | `datetime` | Any valid datetime | Inclusive start timestamp. |
-| `end` | `datetime` | Any valid datetime | Exclusive end timestamp. |
-| `resolution` | `timedelta` | Any positive duration (internally converted to minutes) | Output time resolution. Default: `timedelta(hours=1)`. |
-| `n_trucks` | `int` | Any integer accepted by API | Number of simulated trucks. Default: `1`. |
-| `location_type` | `Literal[...]` | `"distribution_center"`, `"general_cargo_depot"`, `"cep_depot"`, `"shipping_center"`, `"warehouse"`, `"rest_stop"` | Logistics site type. |
-| `power_nom_charging_point_kw` | `float` | Any float accepted by API | Nominal charging point power in kW. Default: `150`. |
-| `charging_mode` | `Literal["AC", "DC"] \| None` | `"AC"`, `"DC"`, `None` | Charging mode selector. |
-| `charging_efficiency` | `float` | Any float accepted by API | Charging efficiency factor. Default: `0.95`. |
-| `soc_cc_to_cv` | `float` | Any float accepted by API | SOC threshold for CC-to-CV transition. Default: `0.8`. |
-| `switch_off_power_kw` | `float` | Any float accepted by API | Stop charging when power falls below this threshold (kW). Default: `1.0`. |
-| `min_charging_duration_minutes` | `int` | Any integer accepted by API | Minimum charging event duration (minutes). Default: `5`. |
-| `country` | `str` | ISO country code supported by `holidays` (default `"DE"`) | Country for holiday handling. |
-| `subdiv` | `str` | Subdivision code valid for selected `country` (default `"BW"`) | Regional subdivision for holiday handling. |
+| Name                            | Type                          | Allowed values                                                                                                     | Description                                                               |
+|---------------------------------|-------------------------------|--------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
+| `start`                         | `datetime`                    | Any valid datetime                                                                                                 | Inclusive start timestamp.                                                |
+| `end`                           | `datetime`                    | Any valid datetime                                                                                                 | Exclusive end timestamp.                                                  |
+| `resolution`                    | `timedelta`                   | Any positive duration (internally converted to minutes)                                                            | Output time resolution. Default: `timedelta(hours=1)`.                    |
+| `n_trucks`                      | `int`                         | Any integer accepted by API                                                                                        | Number of simulated trucks. Default: `1`.                                 |
+| `location_type`                 | `Literal[...]`                | `"distribution_center"`, `"general_cargo_depot"`, `"cep_depot"`, `"shipping_center"`, `"warehouse"`, `"rest_stop"` | Logistics site type.                                                      |
+| `power_nom_charging_point_kw`   | `float`                       | Any float accepted by API                                                                                          | Nominal charging point power in kW. Default: `150`.                       |
+| `charging_mode`                 | `Literal["AC", "DC"] \| None` | `"AC"`, `"DC"`, `None`                                                                                             | Charging mode selector.                                                   |
+| `charging_efficiency`           | `float`                       | Any float accepted by API                                                                                          | Charging efficiency factor. Default: `0.95`.                              |
+| `soc_cc_to_cv`                  | `float`                       | Any float accepted by API                                                                                          | SOC threshold for CC-to-CV transition. Default: `0.8`.                    |
+| `switch_off_power_kw`           | `float`                       | Any float accepted by API                                                                                          | Stop charging when power falls below this threshold (kW). Default: `1.0`. |
+| `min_charging_duration_minutes` | `int`                         | Any integer accepted by API                                                                                        | Minimum charging event duration (minutes). Default: `5`.                  |
+| `country`                       | `str`                         | ISO country code supported by `holidays` (default `"DE"`)                                                          | Country for holiday handling.                                             |
+| `subdiv`                        | `str`                         | Subdivision code valid for selected `country` (default `"BW"`)                                                     | Regional subdivision for holiday handling.                                |
+| `random_seed`                   | `int \| None`                 | Any integer or `None` (default: `None`)                                                                            | Seed passed to numpy.random.default_rng for reproducibility               |
 
 ## Notes
 
@@ -76,6 +78,7 @@ flowchart TD
 ### 1. Define input parameters
 
 Input:
+
 - Simulation period
 - Number of trucks
 - Location type (for example: depot, logistics center, rest stop)
@@ -93,6 +96,7 @@ Result: time windows in which trucks can potentially charge.
 ### 3. Sample vehicle and charging parameters
 
 For each truck, sample:
+
 - Battery capacity
 - Initial SOC (state of charge)
 - Target SOC
@@ -126,6 +130,7 @@ This enables integration into energy system and grid models.
 ### 7. Output: charging park load profile
 
 Output:
+
 - Power time series
 - Format: `pandas.DataFrame`
 - Unit: kW

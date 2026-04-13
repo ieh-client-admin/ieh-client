@@ -16,19 +16,21 @@ df = client.generate_charging_point_profile(
     coordinates=(48.7784, 9.1800),
     power_nom_kw=(11.0, 22.0),
     charging_mode="AC",
+    random_seed=42,
 )
 ```
 
 ## Parameters
 
-| Name | Type | Allowed values | Description |
-|---|---|---|---|
-| `start` | `datetime` | Any valid datetime | Inclusive start timestamp. |
-| `end` | `datetime` | Any valid datetime | Exclusive end timestamp. |
-| `resolution` | `timedelta` | Any positive duration (internally converted to minutes) | Output time resolution. Default: `timedelta(hours=1)`. |
-| `coordinates` | `tuple[float, float] \| None` | Tuple `(latitude, longitude)` | Geographic location of the charging point. |
-| `power_nom_kw` | `float \| tuple[float, float] \| None` | Single value or `(min_kw, max_kw)` with `min_kw <= max_kw` | Nominal charging power range in kW. |
-| `charging_mode` | `str \| None` | Typical values: `"AC"`, `"DC"` | Charging technology label passed to API. |
+| Name            | Type                                   | Allowed values                                             | Description                                                 |
+|-----------------|----------------------------------------|------------------------------------------------------------|-------------------------------------------------------------|
+| `start`         | `datetime`                             | Any valid datetime                                         | Inclusive start timestamp.                                  |
+| `end`           | `datetime`                             | Any valid datetime                                         | Exclusive end timestamp.                                    |
+| `resolution`    | `timedelta`                            | Any positive duration (internally converted to minutes)    | Output time resolution. Default: `timedelta(hours=1)`.      |
+| `coordinates`   | `tuple[float, float] \| None`          | Tuple `(latitude, longitude)`                              | Geographic location of the charging point.                  |
+| `power_nom_kw`  | `float \| tuple[float, float] \| None` | Single value or `(min_kw, max_kw)` with `min_kw <= max_kw` | Nominal charging power range in kW.                         |
+| `charging_mode` | `str \| None`                          | Typical values: `"AC"`, `"DC"`                             | Charging technology label passed to API.                    |
+| `random_seed`   | `int \| None`                          | Any integer or `None` (default: `None`)                    | Seed passed to numpy.random.default_rng for reproducibility |
 
 ## Notes
 

@@ -115,7 +115,8 @@ class ProfileAPIClient(_APIClient):
             yearly_energy_kwh: float | Iterable[float] = 1000,
             working_days: Iterable[int | Literal[
                 "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "public_holiday"
-            ]] | None = None
+            ]] | None = None,
+            random_seed: int | None = None,
     ) -> pd.DataFrame:
         """Generate a building load profile via the BLPG endpoint.
 
@@ -134,6 +135,8 @@ class ProfileAPIClient(_APIClient):
             working_days (Iterable[int | Literal[...]] | None, optional):
                 Active weekdays as integers (``0`` = Monday, ..., ``6`` = Sunday)
                 or names (``"monday"`` ... ``"sunday"``, ``"public_holiday"``).
+            random_seed (int, optional): Random seed used in all numpy.random calls to ensure reproducibility.
+                Defaults to ``None``.
 
         Returns:
             pd.DataFrame: Generated load profile time series.
@@ -169,7 +172,8 @@ class ProfileAPIClient(_APIClient):
             "resolution_minutes": int(resolution.total_seconds() // 60),
             "building_usage": building_usage,
             "yearly_energy_kwh": yearly_energy_kwh,
-            "working_days": working_days
+            "working_days": working_days,
+            "random_seed": random_seed,
         }
         data = self._post("/generate-building-profile", payload)
         return self._process_response(data)
@@ -185,6 +189,8 @@ class ProfileAPIClient(_APIClient):
             coordinates: None | tuple[float, float] = None,
             power_nom_kw: None | float | tuple[float, float] = None,
             charging_mode: None | str = None,
+            n_cps: int = 1,
+            random_seed=None,
     ) -> pd.DataFrame:
         """Generate a charging-point load profile via the CPLPG endpoint.
 
@@ -200,6 +206,12 @@ class ProfileAPIClient(_APIClient):
                 ``(min_kw, max_kw)``.
             charging_mode (str | None, optional):
                 Charging mode (typically ``"AC"`` or ``"DC"``).
+            n_cps (int, optional):
+                Number of charging-point profiles to generate. If greater
+                than one, profiles are generated independently and returned
+                in a DataFrame with one column per profile when calling CPPGenerator.run.
+            random_seed (int, optional): Random seed used in all numpy.random calls to ensure reproducibility.
+                Defaults to ``None``.
 
         Returns:
             pd.DataFrame: Generated charging-point load profile.
@@ -223,6 +235,7 @@ class ProfileAPIClient(_APIClient):
                 coordinates=(48.7784, 9.1800),
                 power_nom_kw=(11.0, 22.0),
                 charging_mode="AC",
+                n_cps=1,
             )
             ```
         """
@@ -241,7 +254,9 @@ class ProfileAPIClient(_APIClient):
             "longitude": coordinates[1],
             "power_range_lower": power_nom_kw[0],
             "power_range_upper": power_nom_kw[1],
-            "charging_mode": charging_mode
+            "charging_mode": charging_mode,
+            "n_cps": n_cps,
+            "random_seed": random_seed,
         }
         data = self._post("/generate-charging-profile", payload)
         return self._process_response(data)
@@ -271,6 +286,7 @@ class ProfileAPIClient(_APIClient):
             min_charging_duration_minutes: int = 5,
             country: str = "DE",
             subdiv: str = "BW",
+            random_seed=None
     ) -> pd.DataFrame:
         """Generate a truck charging profile via the TLPG endpoint.
 
@@ -299,6 +315,8 @@ class ProfileAPIClient(_APIClient):
                 Defaults to ``"DE"``.
             subdiv (str, optional): Subdivision code for holiday handling.
                 Defaults to ``"BW"``.
+            random_seed (int, optional): Random seed used in all numpy.random calls to ensure reproducibility.
+                Defaults to ``None``.
 
         Returns:
             pd.DataFrame: Generated truck charging load profile.
@@ -344,7 +362,8 @@ class ProfileAPIClient(_APIClient):
             "switch_off_power_kw": switch_off_power_kw,
             "min_charging_duration_minutes": min_charging_duration_minutes,
             "country": country,
-            "subdiv": subdiv
+            "subdiv": subdiv,
+            "random_seed": random_seed,
         }
         data = self._post("/generate-truck-profile", payload)
         return self._process_response(data)

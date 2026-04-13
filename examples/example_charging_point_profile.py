@@ -12,6 +12,7 @@ def main() -> None:
         coordinates=(48.7784, 9.1800),
         power_nom_kw=(11.0, 22.0),
         charging_mode="AC",
+        random_seed=None,
     )
     print(df.head())
 
